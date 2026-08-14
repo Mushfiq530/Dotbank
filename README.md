@@ -16,6 +16,19 @@
 
 ---
 
+## 📚 Table of Contents
+
+- [Features](#-features)
+- [Tech Stack](#️-tech-stack)
+- [Project Structure](#-project-structure)
+- [Quick Start](#-quick-start)
+- [Backend Notes](#-backend-notes)
+- [Known Limitations](#️-known-limitations)
+- [Troubleshooting](#-troubleshooting)
+- [License](#-license)
+
+---
+
 ## ✨ Features
 
 - 🔐 **Role-Based Access** — separate experiences for **Users**, **Officers**, and **Admins**, each with their own dashboard
@@ -24,6 +37,7 @@
 - 💰 **Loan Requests** — users submit loan requests; officers/admins review and approve
 - 📊 **Mini Statements** — monthly transaction breakdowns computed from real transaction history
 - 🚨 **Officer Tools** — account requests queue, loan requests queue, large-transaction alerts, user/officer activity logs
+- 🔔 **Notifications** — real-time notification feed for account activity, delivered per user
 - 🛠️ **Admin Console** — manage users, manage officers, manage accounts, add new officers with a one-time temporary password
 - 🔑 **Hardened Auth** — brute-force lockout, session regeneration on login, `HttpOnly`/`SameSite` cookies, OTP-based password reset
 - 🧾 **Auditability** — every write to money is wrapped in a real database transaction, with row-locking to prevent double-approvals and race-condition overdrafts
@@ -157,11 +171,12 @@ Open **http://localhost:5173** in your browser.
 
 If you already have a `banking_system` database from an older version of this project, see [`backend/README.md`](backend/README.md) for the manual migration statements instead of re-running the full schema.
 
-## ⚠️ Known Gaps
+## ⚠️ Known Limitations
 
-- The Notifications page will show "No notifications yet" — nothing currently writes to the `notification` table, only reads from it.
-- Officers aren't yet forced through a reset-password screen after their first login with a temporary password, even though the backend flags the account for it.
-- `SmsService` is a development stub that logs OTPs to `backend/storage/sms_log.txt` in plaintext — swap in a real SMS gateway before any production use.
+These are the remaining gaps between this project and a production-ready deployment:
+
+- **Forced password reset** — officers are flagged with `must_reset_password` on creation, but the frontend doesn't yet redirect them to a reset screen on first login; they can still sign in with the temporary password as-is.
+- **SMS delivery** — `SmsService` is a development stub that writes OTP codes in plaintext to `backend/storage/sms_log.txt` instead of sending a real message. Swap in an actual SMS gateway before any production use.
 
 ## 🩺 Troubleshooting
 
