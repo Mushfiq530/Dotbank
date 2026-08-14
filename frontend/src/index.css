@@ -1,0 +1,174 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: light dark;
+  }
+
+  body {
+    @apply font-body text-ink dark:text-inkDark antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid #4361EE;
+    outline-offset: 2px;
+  }
+
+  .dark :focus-visible {
+    outline-color: #7B9EFF;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* Purely decorative/ambient background motion (floating icons, bokeh
+       orbs, gradient drift) is exempt: excluding it here means the reset
+       below never touches it in the first place. (An earlier attempt tried
+       to "undo" the reset afterward with `revert`, but `revert` rolls back
+       to the browser's default stylesheet — animation-duration: 0s — not
+       to the inline animation these elements set, so it silently did
+       nothing. Excluding via :not() avoids that trap entirely.) */
+    *:not(.amb-motion):not(.amb-motion *),
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Glass morphism card */
+  .glass {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10;
+  }
+
+  .glass-light {
+    @apply bg-white/80 backdrop-blur-xl border border-black/5;
+  }
+
+  /* Gradient text utility */
+  .gradient-text {
+    @apply bg-gradient-brand bg-clip-text text-transparent;
+  }
+
+  /* Glowing button */
+  .btn-glow {
+    @apply relative overflow-hidden;
+    box-shadow: 0 0 20px rgba(67,97,238,0.4), 0 4px 16px rgba(67,97,238,0.2);
+  }
+
+  .btn-glow:hover {
+    box-shadow: 0 0 32px rgba(67,97,238,0.6), 0 4px 20px rgba(67,97,238,0.3);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-ink-muted/30 dark:bg-inkDark-muted/30 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-muted/50 dark:bg-inkDark-muted/50;
+  }
+
+  /* Shimmer animation for loading */
+  .shimmer {
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2.5s linear infinite;
+  }
+
+  /* Mesh gradient orb */
+  .orb {
+    @apply absolute rounded-full blur-3xl pointer-events-none;
+  }
+
+  /* Sidebar item */
+  .nav-item {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150;
+  }
+
+  .nav-item-active {
+    @apply bg-brand-blue text-white shadow-glowSm;
+  }
+
+  .nav-item-inactive {
+    @apply text-inkDark-muted hover:bg-white/5 hover:text-inkDark;
+  }
+
+  /* Card variants */
+  .card {
+    @apply rounded-card bg-white dark:bg-surfaceDark border border-black/5 dark:border-white/10 shadow-card dark:shadow-cardDark;
+  }
+
+  /* Input base */
+  .input-base {
+    @apply w-full rounded-xl border bg-surface-sunk dark:bg-surfaceDark-sunk
+           px-4 py-3 text-sm text-ink dark:text-inkDark
+           border-black/10 dark:border-white/10
+           placeholder:text-ink-muted/50 dark:placeholder:text-inkDark-muted/50
+           focus:border-brand-blue dark:focus:border-brand-bluelight focus:ring-2
+           focus:ring-brand-blue/10 dark:focus:ring-brand-bluelight/10
+           outline-none transition-all duration-200;
+  }
+
+  /* Status badge */
+  .badge-active {
+    @apply inline-flex items-center gap-1 rounded-full bg-successDark/10 px-2.5 py-0.5 text-xs font-medium text-successDark;
+  }
+
+  .badge-frozen {
+    @apply inline-flex items-center gap-1 rounded-full bg-brand-blue/10 px-2.5 py-0.5 text-xs font-medium text-brand-bluelight;
+  }
+
+  .badge-pending {
+    @apply inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-400;
+  }
+}
+
+/* Landing page animated gradient orbs */
+.hero-orb-1 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(67,97,238,0.18) 0%, transparent 70%);
+  top: -100px;
+  left: -100px;
+  animation: float 8s ease-in-out infinite;
+}
+
+.hero-orb-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(124,58,237,0.15) 0%, transparent 70%);
+  bottom: -80px;
+  right: -80px;
+  animation: float 10s ease-in-out infinite reverse;
+}
+
+.hero-orb-3 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(6,182,212,0.12) 0%, transparent 70%);
+  top: 40%;
+  left: 55%;
+  animation: float 7s ease-in-out infinite 2s;
+}
+
+/* Credit card shine effect */
+.card-shine {
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,0.06) 40%,
+    rgba(255,255,255,0.12) 50%,
+    rgba(255,255,255,0.06) 60%,
+    rgba(255,255,255,0) 100%
+  );
+}

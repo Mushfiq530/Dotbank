@@ -1,0 +1,37 @@
+# ─── Environment / secrets ──────────────────────────────────
+# Real credentials live here — never commit this. Only .env.example
+# (which has placeholder values) should ever be pushed.
+backend/.env
+
+# ─── Backend runtime data ───────────────────────────────────
+# Uploaded profile pictures are user data generated at runtime, not
+# source code — never push real uploaded files. Keep the folder itself
+# tracked via .gitkeep (added separately) so the app still has
+# somewhere to write to after a fresh clone.
+backend/public/uploads/profile_pictures/*
+!backend/public/uploads/profile_pictures/.gitkeep
+
+# SmsService writes plaintext OTP codes here in dev — never commit.
+backend/storage/
+
+# Composer dependencies — installed via `composer install`, not versioned.
+backend/vendor/
+
+# ─── Frontend build artifacts / dependencies ────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# Vite cache
+frontend/.vite/
+
+# ─── Editor / OS junk ────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# ─── Logs ────────────────────────────────────────────────────
+*.log
+npm-debug.log*
