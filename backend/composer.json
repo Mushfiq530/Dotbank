@@ -1,0 +1,17 @@
+{
+    "name": "banking-system/backend",
+    "description": "Banking system backend",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "ext-pdo": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}
