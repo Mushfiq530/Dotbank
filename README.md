@@ -162,7 +162,7 @@ Open **http://localhost:5173** in your browser.
 
 ## 🔧 Backend Notes
 
-- **No CORS surprises**: the API is pre-configured to allow requests from the Vite dev server at `http://localhost:5173` with credentials — if you change the frontend port, update `backend/public/index.php`.
+- **No CORS surprises**: the API is pre-configured to allow requests from the Vite dev server at `http://localhost:5000` with credentials — if you change the frontend port, update `backend/public/index.php`.
 - **Transactions are atomic**: transfers, withdrawals, bill payments, and approvals all run inside real database transactions with row-locking, so a failure mid-write can't silently lose or duplicate money.
 - **OTP is single-use**: password-reset codes are consumed atomically, closing a replay window.
 - **Officer passwords**: new officers get a random 12-character temporary password (not a shared default) and are flagged to reset it on first login.
