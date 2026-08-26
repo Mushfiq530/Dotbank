@@ -5,22 +5,15 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Exceptions\AuthenticationException;
-use App\Models\Account;
 use App\Models\Admin;
 use App\Models\LoginAttempt;
 use App\Models\Officer;
-use App\Models\OfficerAlert;
 use App\Models\User;
-use App\Models\UserLog;
 use App\Support\SessionManager;
 
 final class LoginController
 {
     private const MAX_FAILED_ATTEMPTS = 5;
-
-    // A regular user's account gets frozen after this many wrong passwords
-    // (counted across all devices, not just one — see LoginAttempt::totalFailedAttempts).
-    private const MAX_USER_FAILED_ATTEMPTS_BEFORE_FREEZE = 3;
 
     public static function userLogin(string $userId, string $password, string $deviceId): bool
     {
@@ -33,8 +26,7 @@ final class LoginController
                 return $user->verifyPassword($password);
             },
             'user_id',
-            $userId,
-            self::freezeUserAccountsAfterRepeatedFailure(...)
+            $userId
         );
     }
 
@@ -71,15 +63,19 @@ final class LoginController
     /**
      * Shared login flow for all three actor types: consistent brute-force
      * lockout, and session-fixation protection via ID regeneration on
-     * success. The original code only rate-limited regular users and
-     * never regenerated the session id after login.
+     * success.
+     *
+     * Note: the "freeze a user's account after 3 failed attempts" logic
+     * that used to run from here (see the old
+     * freezeUserAccountsAfterRepeatedFailure() private method) has moved
+     * to trg_login_attempt_after_insert in the database (21_triggers.sql).
+     * It now fires automatically the moment LoginAttempt::record() inserts
+     * a failed attempt below — this method no longer needs to trigger it
+     * manually.
      *
      * @template T
      * @param callable(): ?T $find
      * @param callable(T): bool $verify
-     * @param (callable(string): void)|null $onFailure  extra hook run after
-     *        a failed attempt is recorded (currently only used to freeze a
-     *        user's account after repeated failures — see userLogin()).
      */
     private static function attemptLogin(
         string $accountType,
@@ -88,8 +84,7 @@ final class LoginController
         callable $find,
         callable $verify,
         string $sessionKey,
-        string $sessionValue,
-        ?callable $onFailure = null
+        string $sessionValue
     ): bool {
         SessionManager::start();
 
@@ -101,10 +96,6 @@ final class LoginController
 
         if (!$account || !$verify($account)) {
             LoginAttempt::record($accountType, $accountId, $deviceId, false);
-
-            if ($onFailure) {
-                $onFailure($accountId);
-            }
 
             return false;
         }
@@ -119,53 +110,6 @@ final class LoginController
         $_SESSION[$sessionKey] = $sessionValue;
 
         return true;
-    }
-
-    /**
-     * After 3 wrong passwords (across any device) for a regular user,
-     * freeze every account that user owns and raise an alert for
-     * officers/admins to review. Idempotent: if the account is already
-     * frozen (e.g. the user kept retrying after the freeze already fired),
-     * this does nothing further so officers aren't spammed with duplicate
-     * alerts for the same lockout.
-     */
-    private static function freezeUserAccountsAfterRepeatedFailure(string $userId): void
-    {
-        $failed = LoginAttempt::totalFailedAttempts('USER', $userId);
-
-        if ($failed < self::MAX_USER_FAILED_ATTEMPTS_BEFORE_FREEZE) {
-            return;
-        }
-
-        $accounts = Account::findAllByUserId($userId);
-        $frozenAccountNos = [];
-
-        foreach ($accounts as $account) {
-            if ($account->status === 'ACTIVE') {
-                $account->block();
-                $frozenAccountNos[] = $account->accountNo;
-            }
-        }
-
-        if ($frozenAccountNos === []) {
-            // Nothing to freeze — either the user has no accounts yet,
-            // or everything they have was already frozen. Don't re-alert.
-            return;
-        }
-
-        foreach ($frozenAccountNos as $accountNo) {
-            OfficerAlert::create(
-                $userId,
-                $accountNo,
-                "Account {$accountNo} was auto-frozen after 3 failed login attempts."
-            );
-
-            try {
-                UserLog::log($userId, $accountNo, 'SYSTEM', 'SYSTEM', 'Account frozen after 3 failed login attempts');
-            } catch (\Throwable $e) {
-                error_log('UserLog::log failed during auto-freeze: ' . $e->getMessage());
-            }
-        }
     }
 
     public static function logout(): void

@@ -182,7 +182,34 @@ try {
             $actor = requireRole('user');
             UserController::requestAccount(genId('AR'), $actor['id'], $body['accountType'] ?? '', (float) ($body['initialDeposit'] ?? 0));
             respond(['success' => true, 'message' => 'Account request submitted.']);
+        // ---------- OFFICER: deposit requests (walk-in cash intake) ----------
+        case $path === '/deposit-requests' && $method === 'POST':
+            $actor = requireRole('officer');
+            OfficerController::createDepositRequest(
+                genId('DR'),
+                $body['requesterName'] ?? '',
+                $body['source'] ?? '',
+                (float) ($body['amount'] ?? 0),
+                $actor['id'],
+                $body['actorName'] ?? $actor['id']
+            );
+            respond(['success' => true, 'message' => 'Deposit request recorded.']);
 
+        case $path === '/deposit-requests' && $method === 'GET':
+            $actor = currentRole();
+            if (!$actor || !in_array($actor['role'], ['officer', 'admin'], true)) respond(['success' => false], 401);
+            respond(['requests' => \App\Models\DepositRequest::getAll()]);
+
+        case preg_match('#^/deposit-requests/([\w-]+)/(approve|deny)$#', $path, $m) === 1 && $method === 'POST':
+            $actor = currentRole();
+            if (!$actor || !in_array($actor['role'], ['officer', 'admin'], true)) respond(['success' => false], 401);
+            $officerName = $body['actorName'] ?? $actor['id'];
+            if ($m[2] === 'approve') {
+                OfficerController::approveDepositRequest($m[1], $body['accountNo'] ?? '', $actor['id'], $officerName);
+            } else {
+                OfficerController::denyDepositRequest($m[1], $actor['id'], $officerName);
+            }
+            respond(['success' => true]);
         // ---------- OFFICER/ADMIN: account requests ----------
         case $path === '/account-requests' && $method === 'GET':
             respond(['requests' => Database::getConnection()->query('SELECT * FROM account_request')->fetchAll()]);
@@ -309,14 +336,14 @@ try {
             if (!$actor || !in_array($actor['role'], ['officer', 'admin'], true)) respond(['success' => false], 401);
             respond(['requests' => TransactionController::getPendingLargeTransactions()]);
 
-        case preg_match('#^/large-transaction-requests/(\d+)/(approve|deny)$#', $path, $m) === 1 && $method === 'POST':
+                case preg_match('#^/large-transaction-requests/(\d+)/(approve|deny)$#', $path, $m) === 1 && $method === 'POST':
             $actor = currentRole();
             if (!$actor || !in_array($actor['role'], ['officer', 'admin'], true)) respond(['success' => false], 401);
+            $officerName = $body['actorName'] ?? $actor['id'];
             $m[2] === 'approve'
-                ? TransactionController::approveLargeTransaction((int) $m[1], $actor['id'])
-                : TransactionController::denyLargeTransaction((int) $m[1], $actor['id']);
+                ? TransactionController::approveLargeTransaction((int) $m[1], $actor['id'], $officerName)
+                : TransactionController::denyLargeTransaction((int) $m[1], $actor['id'], $officerName);
             respond(['success' => true]);
-
         // ---------- ADMIN/OFFICER: recent transactions ----------
         case $path === '/admin/transactions' && $method === 'GET':
             $actor = currentRole();

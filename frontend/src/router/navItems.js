@@ -16,6 +16,7 @@ import {
   KeyRound,
   BellRing,
   ShieldAlert,
+  PiggyBank,
 } from "lucide-react";
 
 
@@ -35,6 +36,7 @@ export const officerNavItems = [
   { to: "/officer/accounts", label: "Accounts", icon: Users },
   { to: "/officer/account-requests", label: "Account Requests", icon: Inbox },
   { to: "/officer/loan-requests", label: "Loan Requests", icon: Landmark },
+  { to: "/officer/deposit-requests", label: "Deposit Requests", icon: PiggyBank },
   { to: "/officer/large-transactions", label: "Large Transactions", icon: ShieldAlert },
   { to: "/officer/statement-viewer", label: "Statement Viewer", icon: Search },
   { to: "/officer/user-logs", label: "User Logs", icon: ScrollText },
@@ -48,6 +50,7 @@ export const adminNavItems = [
   { to: "/admin/manage-officers", label: "Manage Officers", icon: ShieldCheck },
   { to: "/admin/manage-users", label: "Manage Users", icon: Users },
   { to: "/admin/manage-accounts", label: "Manage Accounts", icon: Wallet },
+  { to: "/admin/deposit-requests", label: "Deposit Requests", icon: PiggyBank },
   { to: "/admin/large-transactions", label: "Large Transactions", icon: ShieldAlert },
   { to: "/admin/logs", label: "Logs", icon: ScrollText },
   { to: "/admin/alerts", label: "Account Alerts", icon: BellRing },

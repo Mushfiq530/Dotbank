@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Config\Database;
+use App\Exceptions\AccountFrozenException;
+use App\Exceptions\InsufficientFundsException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
+use PDO;
 
 final class LoanReq
 {
@@ -23,37 +26,36 @@ final class LoanReq
         $stmt->execute([$loanId, $accountNo, $amount]);
     }
 
+    /**
+     * Delegates to sp_approve_loan(), which locks the loan row, credits
+     * the account, and flips the loan to APPROVED inside one procedure
+     * call instead of PHP orchestrating the SELECT ... FOR UPDATE,
+     * Account::deposit(), and UPDATE separately.
+     */
     public static function approve(string $loanId, string $officerId): void
     {
-        Database::transaction(function ($conn) use ($loanId, $officerId) {
-            $stmt = $conn->prepare(
-                'SELECT * FROM loan_request WHERE loan_id = ? FOR UPDATE'
-            );
-            $stmt->execute([$loanId]);
-            $loan = $stmt->fetch();
+        Database::transaction(function (PDO $conn) use ($loanId, $officerId) {
+            $call = $conn->prepare('CALL sp_approve_loan(?, ?, @status)');
+            $call->execute([$loanId, $officerId]);
+            $call->closeCursor();
 
-            if (!$loan) {
-                throw new NotFoundException('Loan not found');
+            $status = (string) $conn->query('SELECT @status AS status')->fetch()['status'];
+
+            switch ($status) {
+                case 'OK':
+                    return;
+                case 'NOT_FOUND':
+                    throw new NotFoundException('Loan not found');
+                case 'ALREADY_REVIEWED':
+                    throw new ValidationException('Loan has already been reviewed.');
+                case 'ACCOUNT_NOT_FOUND':
+                    throw new NotFoundException('Account not found');
+                case 'FROZEN':
+                    throw new AccountFrozenException('This account is frozen. Contact an officer to reactivate it.');
+                default:
+                    throw new \RuntimeException("Unexpected status from sp_approve_loan: {$status}");
             }
-
-            if ($loan['status'] !== 'PENDING') {
-                throw new ValidationException('Loan has already been reviewed.');
-            }
-
-            $account = Account::findByAccountNo($loan['account_no']);
-
-            if (!$account) {
-                throw new NotFoundException('Account not found');
-            }
-
-            $account->deposit((float) $loan['amount']);
-
-            $update = $conn->prepare(
-                "UPDATE loan_request SET status = 'APPROVED', reviewed_by = ? WHERE loan_id = ?"
-            );
-            $update->execute([$officerId, $loanId]);
         });
-        
     }
 
     public static function deny(string $loanId, string $officerId): void
@@ -63,6 +65,7 @@ final class LoanReq
         );
         $stmt->execute([$officerId, $loanId]);
     }
+
     /**
      * All loan requests belonging to accounts owned by this user, newest first.
      * Used by the user's "My Loans" list so they can see status and repay
@@ -82,47 +85,37 @@ final class LoanReq
     }
 
     /**
-     * Pays back an APPROVED loan in one shot: withdraws the full loan amount
-     * from the account it was disbursed to and marks the loan REPAID.
-     * Ownership is checked (the account must belong to $userId) so a user
-     * can't repay someone else's loan by guessing a loan ID. Withdrawal,
-     * the transaction record, and the status flip all happen in one DB
-     * transaction so a failure partway through can't leave the loan marked
-     * repaid without the money actually moving (or vice versa).
+     * Delegates to sp_repay_loan(), which locks the loan row, verifies
+     * ownership, withdraws the amount, records the transaction, and
+     * marks the loan REPAID inside one procedure call.
      */
     public static function repay(string $loanId, string $userId): void
     {
-        Database::transaction(function ($conn) use ($loanId, $userId) {
-            $stmt = $conn->prepare('SELECT * FROM loan_request WHERE loan_id = ? FOR UPDATE');
-            $stmt->execute([$loanId]);
-            $loan = $stmt->fetch();
+        Database::transaction(function (PDO $conn) use ($loanId, $userId) {
+            $call = $conn->prepare('CALL sp_repay_loan(?, ?, @status)');
+            $call->execute([$loanId, $userId]);
+            $call->closeCursor();
 
-            if (!$loan) {
-                throw new NotFoundException('Loan not found');
+            $status = (string) $conn->query('SELECT @status AS status')->fetch()['status'];
+
+            switch ($status) {
+                case 'OK':
+                    return;
+                case 'NOT_FOUND':
+                    throw new NotFoundException('Loan not found');
+                case 'NOT_APPROVED':
+                    throw new ValidationException('Only approved loans can be repaid.');
+                case 'ACCOUNT_NOT_FOUND':
+                    throw new NotFoundException('Account not found');
+                case 'NOT_OWNER':
+                    throw new ValidationException('This loan does not belong to you.');
+                case 'FROZEN':
+                    throw new AccountFrozenException('This account is frozen. Contact an officer to reactivate it.');
+                case 'INSUFFICIENT':
+                    throw new InsufficientFundsException('Insufficient balance');
+                default:
+                    throw new \RuntimeException("Unexpected status from sp_repay_loan: {$status}");
             }
-
-            if ($loan['status'] !== 'APPROVED') {
-                throw new ValidationException('Only approved loans can be repaid.');
-            }
-
-            $account = Account::findByAccountNo($loan['account_no']);
-
-            if (!$account) {
-                throw new NotFoundException('Account not found');
-            }
-
-            if ($account->userId !== $userId) {
-                throw new ValidationException('This loan does not belong to you.');
-            }
-
-            // Account::withdraw() already checks status = ACTIVE and
-            // sufficient balance atomically at the DB level.
-            $account->withdraw((float) $loan['amount']);
-
-            Transaction::create($loan['account_no'], 'LOAN_REPAYMENT', (float) $loan['amount']);
-
-            $update = $conn->prepare("UPDATE loan_request SET status = 'REPAID' WHERE loan_id = ?");
-            $update->execute([$loanId]);
         });
     }
 }

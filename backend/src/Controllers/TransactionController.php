@@ -17,6 +17,7 @@ use App\Models\LargeTransactionRequest;
 use App\Models\MoneyTransfer;
 use App\Models\Notification;
 use App\Models\OfficerAlert;
+use App\Models\OfficerLog;
 use App\Models\Transaction;
 use App\Models\UserLog;
 use App\Support\Validator;
@@ -194,8 +195,13 @@ final class TransactionController
      * Actually performs the withdrawal/transfer/bill payment that was held
      * for review. Nothing was debited when the request was created — this
      * is the first point the money moves.
+     *
+     * Now also writes to officer_log, matching the same pattern as
+     * OfficerController::approveLoan()/approveAccount() — this is an
+     * officer action and belongs in the officer's own audit trail, not
+     * just the customer-facing user_log entry.
      */
-    public static function approveLargeTransaction(int $id, string $officerId): void
+    public static function approveLargeTransaction(int $id, string $officerId, string $officerName): void
     {
         Database::transaction(function () use ($id, $officerId) {
             $request = LargeTransactionRequest::findByIdForUpdate($id);
@@ -245,9 +251,11 @@ final class TransactionController
             self::logSafely($userId, $accountNo, $officerId, "Approved large transaction #{$id} ({$amount})");
             self::notifySafely($userId, "Your request to move {$amount} from account {$accountNo} was approved and completed.");
         });
+
+        OfficerLog::log($officerId, $officerName, "Approved large transaction #{$id}");
     }
 
-    public static function denyLargeTransaction(int $id, string $officerId): void
+    public static function denyLargeTransaction(int $id, string $officerId, string $officerName): void
     {
         $request = LargeTransactionRequest::findById($id);
 
@@ -266,6 +274,8 @@ final class TransactionController
             $request['user_id'],
             "Your request to move {$request['amount']} from account {$request['account_no']} was denied by an officer. No money was deducted."
         );
+
+        OfficerLog::log($officerId, $officerName, "Denied large transaction #{$id}");
     }
 
     private static function requiresOfficerApproval(float $amount): bool

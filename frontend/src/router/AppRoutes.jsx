@@ -22,6 +22,7 @@ import OfficerDashboardPage from "../pages/officer/OfficerDashboardPage";
 import OfficerAccountsPage from "../pages/officer/OfficerAccountsPage";
 import OfficerAccountRequestsPage from "../pages/officer/OfficerAccountRequestsPage";
 import OfficerLoanRequestsPage from "../pages/officer/OfficerLoanRequestsPage";
+import OfficerDepositRequestsPage from "../pages/officer/OfficerDepositRequestsPage";
 import OfficerLargeTransactionsPage from "../pages/officer/OfficerLargeTransactionsPage";
 import OfficerStatementViewerPage from "../pages/officer/OfficerStatementViewerPage";
 import OfficerUserLogsPage from "../pages/officer/OfficerUserLogsPage";
@@ -62,6 +63,7 @@ export default function AppRoutes() {
       <Route path="/officer/accounts" element={<OfficerAccountsPage />} />
       <Route path="/officer/account-requests" element={<OfficerAccountRequestsPage />} />
       <Route path="/officer/loan-requests" element={<OfficerLoanRequestsPage />} />
+      <Route path="/officer/deposit-requests" element={<OfficerDepositRequestsPage />} />
       <Route path="/officer/large-transactions" element={<OfficerLargeTransactionsPage />} />
       <Route path="/officer/statement-viewer" element={<OfficerStatementViewerPage />} />
       <Route path="/officer/user-logs" element={<OfficerUserLogsPage />} />
@@ -74,6 +76,7 @@ export default function AppRoutes() {
       <Route path="/admin/manage-officers" element={<AdminManageOfficersPage />} />
       <Route path="/admin/manage-users" element={<AdminManageUsersPage />} />
       <Route path="/admin/manage-accounts" element={<AdminManageAccountsPage />} />
+      <Route path="/admin/deposit-requests" element={<OfficerDepositRequestsPage />} />
       <Route path="/admin/large-transactions" element={<OfficerLargeTransactionsPage />} />
       <Route path="/admin/logs" element={<AdminLogsPage />} />
       <Route path="/admin/alerts" element={<OfficerAlertsPage />} />

@@ -5,38 +5,45 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Config\Database;
+use App\Exceptions\AccountFrozenException;
+use App\Exceptions\InsufficientFundsException;
 use App\Exceptions\NotFoundException;
+use App\Exceptions\ValidationException;
+use PDO;
 
-final class BillPayment
+final class BankToMobile
 {
     /**
-     * Withdrawal, the bill_payment record, and the transaction record
-     * now happen inside one DB transaction. Previously the withdrawal
-     * could succeed while the payment record failed to insert, silently
-     * losing the customer's money with no paper trail.
+     * Delegates to sp_mobile_transfer(), same pattern as BankToBank::transfer().
      */
-    public static function pay(
-        string $paymentId,
-        string $accountNo,
-        string $billType,
+    public static function transfer(
+        string $transferId,
+        string $fromAccount,
+        string $mobileNumber,
+        string $provider,
         float $amount
     ): void {
-        Database::transaction(function ($conn) use ($paymentId, $accountNo, $billType, $amount) {
-            $account = Account::findByAccountNo($accountNo);
+        Database::transaction(function (PDO $conn) use ($transferId, $fromAccount, $mobileNumber, $provider, $amount) {
+            $call = $conn->prepare('CALL sp_mobile_transfer(?, ?, ?, ?, ?, @status, @tx_id)');
+            $call->execute([$transferId, $fromAccount, $mobileNumber, $provider, $amount]);
+            $call->closeCursor();
 
-            if (!$account) {
-                throw new NotFoundException('Account not found');
+            $status = (string) $conn->query('SELECT @status AS status')->fetch()['status'];
+
+            switch ($status) {
+                case 'OK':
+                    return;
+                case 'INVALID_AMOUNT':
+                    throw new ValidationException('Invalid amount');
+                case 'NOT_FOUND':
+                    throw new NotFoundException('Account not found');
+                case 'FROZEN':
+                    throw new AccountFrozenException('This account is frozen. Contact an officer to reactivate it.');
+                case 'INSUFFICIENT':
+                    throw new InsufficientFundsException('Insufficient balance');
+                default:
+                    throw new \RuntimeException("Unexpected status from sp_mobile_transfer: {$status}");
             }
-
-            $account->withdraw($amount);
-
-            $stmt = $conn->prepare(
-                'INSERT INTO bill_payment (payment_id, account_no, bill_type, amount, payment_time)
-                 VALUES (?, ?, ?, ?, NOW())'
-            );
-            $stmt->execute([$paymentId, $accountNo, $billType, $amount]);
-
-            Transaction::create($accountNo, 'BILL_PAYMENT', $amount);
         });
     }
 }

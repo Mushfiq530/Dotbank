@@ -22,16 +22,19 @@ final class OfficerAlert
         $stmt->execute([$userId, $accountNo, $message]);
     }
 
+    /**
+     * Reads from officer_alert_with_user (see 19_views.sql) instead of
+     * repeating the LEFT JOIN to `user` here — same columns, same order,
+     * just defined once in the database now.
+     */
     public static function getAll(int $limit = 100, int $offset = 0): array
     {
         $limit = max(1, min($limit, 500));
         $offset = max(0, $offset);
 
         $stmt = Database::getConnection()->prepare(
-            "SELECT oa.*, u.name AS user_name
-             FROM officer_alert oa
-             LEFT JOIN user u ON u.user_id = oa.user_id
-             ORDER BY oa.created_at DESC
+            "SELECT * FROM officer_alert_with_user
+             ORDER BY created_at DESC
              LIMIT {$limit} OFFSET {$offset}"
         );
         $stmt->execute();
@@ -50,7 +53,7 @@ final class OfficerAlert
     public static function unreadCount(): int
     {
         $stmt = Database::getConnection()->query(
-            'SELECT COUNT(*) total FROM officer_alert WHERE is_read = FALSE'
+            'SELECT COUNT(*) total FROM officer_alert_with_user WHERE is_read = FALSE'
         );
 
         return (int) $stmt->fetch()['total'];

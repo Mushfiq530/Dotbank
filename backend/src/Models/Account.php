@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Config\Database;
 use App\Exceptions\AccountFrozenException;
 use App\Exceptions\InsufficientFundsException;
+use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 
 final class Account
@@ -71,61 +72,56 @@ final class Account
         );
     }
 
+    /**
+     * Delegates to sp_deposit() in the database. The procedure returns a
+     * status code via an OUT parameter (rather than a SQL error) so this
+     * method can throw the exact same exception types the old inline-SQL
+     * version did — callers elsewhere in the codebase don't need to change.
+     */
     public function deposit(float $amount): void
     {
-        if ($amount <= 0) {
-            throw new ValidationException('Invalid amount');
+        $status = self::callBalanceProcedure('sp_deposit', $this->accountNo, $amount);
+
+        switch ($status) {
+            case 'OK':
+                $this->balance += $amount;
+                return;
+            case 'INVALID_AMOUNT':
+                throw new ValidationException('Invalid amount');
+            case 'FROZEN':
+                throw new AccountFrozenException('This account is frozen. Contact an officer to reactivate it.');
+            case 'NOT_FOUND':
+                throw new NotFoundException('Account not found');
+            default:
+                throw new \RuntimeException("Unexpected status from sp_deposit: {$status}");
         }
-
-        if ($this->status !== 'ACTIVE') {
-            throw new AccountFrozenException('This account is frozen. Contact an officer to reactivate it.');
-        }
-
-        $stmt = Database::getConnection()->prepare(
-            'UPDATE account SET balance = balance + ? WHERE account_no = ?'
-        );
-        $stmt->execute([$amount, $this->accountNo]);
-
-        $this->balance += $amount;
     }
 
     /**
-     * Withdraws atomically at the database level: the balance check and
-     * the decrement happen in a single conditional UPDATE, so two
-     * concurrent withdrawals against the same account can't both pass a
-     * stale in-PHP balance check and overdraw the account (a classic
-     * check-then-act race condition).
+     * Delegates to sp_withdraw() in the database. Same atomicity guarantee
+     * as before — the balance/status check and the debit happen in one
+     * conditional UPDATE inside the procedure — just executed in MySQL
+     * instead of PHP.
      */
     public function withdraw(float $amount): void
     {
-        if ($amount <= 0) {
-            throw new ValidationException('Invalid amount');
-        }
+        $status = self::callBalanceProcedure('sp_withdraw', $this->accountNo, $amount);
 
-        // The status check lives in the same conditional UPDATE as the balance
-        // check (not a separate "if frozen, throw" beforehand) so a freeze that
-        // happens concurrently, between reading this object and writing the
-        // debit, still can't slip a withdrawal through — same atomicity
-        // reasoning as the balance guard below.
-        $stmt = Database::getConnection()->prepare(
-            "UPDATE account
-             SET balance = balance - ?
-             WHERE account_no = ? AND balance >= ? AND status = 'ACTIVE'"
-        );
-        $stmt->execute([$amount, $this->accountNo, $amount]);
-
-        if ($stmt->rowCount() === 0) {
-            $fresh = self::findByAccountNo($this->accountNo);
-
-            if ($fresh && $fresh->status !== 'ACTIVE') {
+        switch ($status) {
+            case 'OK':
+                $this->balance -= $amount;
+                return;
+            case 'INVALID_AMOUNT':
+                throw new ValidationException('Invalid amount');
+            case 'FROZEN':
                 throw new AccountFrozenException('This account is frozen. Contact an officer to reactivate it.');
-            }
-
-            // Otherwise: insufficient balance, or the account no longer exists.
-            throw new InsufficientFundsException('Insufficient balance');
+            case 'INSUFFICIENT':
+                throw new InsufficientFundsException('Insufficient balance');
+            case 'NOT_FOUND':
+                throw new NotFoundException('Account not found');
+            default:
+                throw new \RuntimeException("Unexpected status from sp_withdraw: {$status}");
         }
-
-        $this->balance -= $amount;
     }
 
     public function block(): void
@@ -144,5 +140,26 @@ final class Account
         );
         $stmt->execute([$this->accountNo]);
         $this->status = 'ACTIVE';
+    }
+
+    /**
+     * Calls a stored procedure of the shape
+     * (IN account_no, IN amount, OUT status) and returns the status.
+     * MySQL OUT params via PDO are read back through a user session
+     * variable (@status) rather than PDO::PARAM_INPUT_OUTPUT, since that
+     * binding mode is unreliable with PDO::ATTR_EMULATE_PREPARES = false
+     * (which this project's Database.php sets).
+     */
+    private static function callBalanceProcedure(string $procedure, string $accountNo, float $amount): string
+    {
+        $conn = Database::getConnection();
+
+        $call = $conn->prepare("CALL {$procedure}(?, ?, @status)");
+        $call->execute([$accountNo, $amount]);
+        $call->closeCursor();
+
+        $result = $conn->query('SELECT @status AS status')->fetch();
+
+        return (string) $result['status'];
     }
 }

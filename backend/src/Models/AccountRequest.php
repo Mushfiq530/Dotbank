@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Config\Database;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
+use PDO;
 
 final class AccountRequest
 {
@@ -28,49 +29,32 @@ final class AccountRequest
     }
 
     /**
-     * Approving a request creates the account, funds it, and marks the
-     * request approved. These three writes now happen inside a single DB
-     * transaction — previously a failure partway through (e.g. the
-     * account insert succeeding but the status update failing) could
-     * leave the request stuck PENDING with an account already created.
+     * Account number generation stays here in PHP (it's an app-layer
+     * format concern, not a database one) and is passed into
+     * sp_approve_account_request(), which then does the account INSERT
+     * and the request UPDATE inside one procedure call.
      */
     public static function approve(string $requestId, string $officerId): string
     {
-        return Database::transaction(function ($conn) use ($requestId, $officerId) {
-            $stmt = $conn->prepare(
-                'SELECT * FROM account_request WHERE request_id = ? FOR UPDATE'
-            );
-            $stmt->execute([$requestId]);
-            $request = $stmt->fetch();
-
-            if (!$request) {
-                throw new NotFoundException('Request not found');
-            }
-
-            if ($request['status'] !== 'PENDING') {
-                throw new ValidationException('Request has already been reviewed.');
-            }
-
+        return Database::transaction(function (PDO $conn) use ($requestId, $officerId) {
             $accountNo = Account::generateAccountNo();
 
-            $insert = $conn->prepare(
-                "INSERT INTO account (account_no, user_id, balance, account_type, status, handled_by)
-                 VALUES (?, ?, ?, ?, 'ACTIVE', ?)"
-            );
-            $insert->execute([
-                $accountNo,
-                $request['user_id'],
-                $request['initial_deposit'],
-                $request['account_type'],
-                $officerId,
-            ]);
+            $call = $conn->prepare('CALL sp_approve_account_request(?, ?, ?, @status)');
+            $call->execute([$requestId, $officerId, $accountNo]);
+            $call->closeCursor();
 
-            $update = $conn->prepare(
-                "UPDATE account_request SET status = 'APPROVED' WHERE request_id = ?"
-            );
-            $update->execute([$requestId]);
+            $status = (string) $conn->query('SELECT @status AS status')->fetch()['status'];
 
-            return $accountNo;
+            switch ($status) {
+                case 'OK':
+                    return $accountNo;
+                case 'NOT_FOUND':
+                    throw new NotFoundException('Request not found');
+                case 'ALREADY_REVIEWED':
+                    throw new ValidationException('Request has already been reviewed.');
+                default:
+                    throw new \RuntimeException("Unexpected status from sp_approve_account_request: {$status}");
+            }
         });
     }
 

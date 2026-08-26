@@ -30,6 +30,17 @@ final class Notification
     }
 
     /**
+     * Delegates to sp_mark_all_read() so "mark everything read" is one
+     * database round trip instead of PHP fetching every unread ID and
+     * looping UPDATE statements.
+     */
+    public static function markAllRead(string $userId): void
+    {
+        $stmt = Database::getConnection()->prepare('CALL sp_mark_all_read(?)');
+        $stmt->execute([$userId]);
+    }
+
+    /**
      * @param int $limit  capped to avoid an unbounded result set for long-lived accounts
      */
     public static function getUserNotifications(string $userId, int $limit = 50, int $offset = 0): array

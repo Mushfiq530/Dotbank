@@ -5,15 +5,20 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Config\Database;
+use App\Exceptions\AccountFrozenException;
+use App\Exceptions\InsufficientFundsException;
 use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
+use PDO;
 
 final class MoneyTransfer
 {
     /**
-     * Debit, credit, and the transfer/transaction records now all happen
-     * inside one DB transaction, so a failure partway through can't leave
-     * money debited from the sender without ever reaching the receiver.
+     * Delegates to sp_transfer_internal(), which performs the debit,
+     * credit, money_transfer record, and transaction record all inside
+     * the database in one call. Database::transaction() still wraps this
+     * so the row locks taken by the procedure's FOR UPDATE selects are
+     * released correctly on commit/rollback.
      */
     public static function transfer(
         string $transferId,
@@ -21,28 +26,30 @@ final class MoneyTransfer
         string $toAccount,
         float $amount
     ): void {
-        if ($fromAccount === $toAccount) {
-            throw new ValidationException('Cannot transfer to the same account.');
-        }
+        Database::transaction(function (PDO $conn) use ($transferId, $fromAccount, $toAccount, $amount) {
+            $call = $conn->prepare('CALL sp_transfer_internal(?, ?, ?, ?, @status, @tx_id)');
+            $call->execute([$transferId, $fromAccount, $toAccount, $amount]);
+            $call->closeCursor();
 
-        Database::transaction(function ($conn) use ($transferId, $fromAccount, $toAccount, $amount) {
-            $sender = Account::findByAccountNo($fromAccount);
-            $receiver = Account::findByAccountNo($toAccount);
+            $status = (string) $conn->query('SELECT @status AS status')->fetch()['status'];
 
-            if (!$sender || !$receiver) {
-                throw new NotFoundException('Account not found');
+            switch ($status) {
+                case 'OK':
+                    return;
+                case 'SAME_ACCOUNT':
+                    throw new ValidationException('Cannot transfer to the same account.');
+                case 'INVALID_AMOUNT':
+                    throw new ValidationException('Invalid amount');
+                case 'NOT_FOUND':
+                    throw new NotFoundException('Account not found');
+                case 'SENDER_FROZEN':
+                case 'RECEIVER_FROZEN':
+                    throw new AccountFrozenException('This account is frozen. Contact an officer to reactivate it.');
+                case 'INSUFFICIENT':
+                    throw new InsufficientFundsException('Insufficient balance');
+                default:
+                    throw new \RuntimeException("Unexpected status from sp_transfer_internal: {$status}");
             }
-
-            $sender->withdraw($amount);
-            $receiver->deposit($amount);
-
-            $stmt = $conn->prepare(
-                'INSERT INTO money_transfer (transfer_id, from_account_no, to_account_no, amount, transfer_time)
-                 VALUES (?, ?, ?, ?, NOW())'
-            );
-            $stmt->execute([$transferId, $fromAccount, $toAccount, $amount]);
-
-            Transaction::create($fromAccount, 'TRANSFER', $amount);
         });
     }
 }

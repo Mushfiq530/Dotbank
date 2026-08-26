@@ -40,7 +40,8 @@ final class UserLog
 
     /**
      * All user_log rows across every user, for the officer/admin log viewer.
-     * Joined with the user's name so the UI doesn't need a second lookup.
+     * Reads from user_log_with_user (see 19_views.sql) instead of
+     * repeating the LEFT JOIN to `user` here.
      */
     public static function getAllLogs(int $limit = 200, int $offset = 0): array
     {
@@ -48,10 +49,8 @@ final class UserLog
         $offset = max(0, $offset);
 
         $stmt = Database::getConnection()->prepare(
-            "SELECT ul.*, u.name AS user_name
-             FROM user_log ul
-             LEFT JOIN user u ON u.user_id = ul.user_id
-             ORDER BY ul.logged_at DESC
+            "SELECT * FROM user_log_with_user
+             ORDER BY logged_at DESC
              LIMIT {$limit} OFFSET {$offset}"
         );
         $stmt->execute();

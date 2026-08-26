@@ -5,17 +5,19 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Config\Database;
+use App\Exceptions\AccountFrozenException;
+use App\Exceptions\InsufficientFundsException;
 use App\Exceptions\NotFoundException;
+use App\Exceptions\ValidationException;
+use PDO;
 
 final class BankToBank
 {
     /**
-     * The original code withdrew from the source account in the
-     * controller, then called this method to record the transfer as a
-     * separate step. If the insert here failed, the money was already
-     * gone with no record of where it went. The withdrawal now happens
-     * inside this method's own transaction so it either fully succeeds
-     * or fully rolls back together.
+     * Delegates to sp_bank_transfer(), which debits the account and
+     * inserts both the bank_to_bank record and the transaction record
+     * inside a single stored procedure call — all-or-nothing, without
+     * PHP needing to orchestrate the individual INSERT/UPDATE statements.
      */
     public static function transfer(
         string $transferId,
@@ -24,22 +26,27 @@ final class BankToBank
         string $receiverAccount,
         float $amount
     ): void {
-        Database::transaction(function ($conn) use ($transferId, $fromAccount, $receiverBank, $receiverAccount, $amount) {
-            $account = Account::findByAccountNo($fromAccount);
+        Database::transaction(function (PDO $conn) use ($transferId, $fromAccount, $receiverBank, $receiverAccount, $amount) {
+            $call = $conn->prepare('CALL sp_bank_transfer(?, ?, ?, ?, ?, @status, @tx_id)');
+            $call->execute([$transferId, $fromAccount, $receiverBank, $receiverAccount, $amount]);
+            $call->closeCursor();
 
-            if (!$account) {
-                throw new NotFoundException('Account not found');
+            $status = (string) $conn->query('SELECT @status AS status')->fetch()['status'];
+
+            switch ($status) {
+                case 'OK':
+                    return;
+                case 'INVALID_AMOUNT':
+                    throw new ValidationException('Invalid amount');
+                case 'NOT_FOUND':
+                    throw new NotFoundException('Account not found');
+                case 'FROZEN':
+                    throw new AccountFrozenException('This account is frozen. Contact an officer to reactivate it.');
+                case 'INSUFFICIENT':
+                    throw new InsufficientFundsException('Insufficient balance');
+                default:
+                    throw new \RuntimeException("Unexpected status from sp_bank_transfer: {$status}");
             }
-
-            $account->withdraw($amount);
-
-            $stmt = $conn->prepare(
-                'INSERT INTO bank_to_bank (transfer_id, receiver_bank, receiver_account)
-                 VALUES (?, ?, ?)'
-            );
-            $stmt->execute([$transferId, $receiverBank, $receiverAccount]);
-
-            Transaction::create($fromAccount, 'TRANSFER', $amount);
         });
     }
 }

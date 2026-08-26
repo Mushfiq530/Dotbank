@@ -53,10 +53,20 @@ final class AdminController
 
     /**
      * Permanently removes a user and everything tied to them: every
-     * transaction/bill-payment/loan-request against each of their accounts,
-     * the accounts themselves, their account requests, notifications, and
-     * finally the user row. Wrapped in one transaction so a failure partway
-     * through can't leave orphaned rows or a half-deleted user behind.
+     * transaction/bill-payment/loan-request/money-transfer/large-transaction-request
+     * against each of their accounts, the accounts themselves, their
+     * account requests, notifications, and finally the user row. Wrapped
+     * in one transaction so a failure partway through can't leave
+     * orphaned rows or a half-deleted user behind.
+     *
+     * money_transfer and large_transaction_request rows are deleted here
+     * because both carry a FOREIGN KEY on account_no — added in
+     * 18_money_transfer.sql and present since the original schema for
+     * large_transaction_request respectively — so leaving them in place
+     * would make the DELETE FROM account below fail with a foreign key
+     * constraint violation whenever the user being removed had ever sent
+     * or received an internal transfer, or filed a large-transaction
+     * request.
      */
     public static function removeUser(string $userId): void
     {
@@ -70,6 +80,14 @@ final class AdminController
                     $del = $conn->prepare("DELETE FROM {$table} WHERE account_no = ?");
                     $del->execute([$accountNo]);
                 }
+
+                $del = $conn->prepare(
+                    'DELETE FROM money_transfer WHERE from_account_no = ? OR to_account_no = ?'
+                );
+                $del->execute([$accountNo, $accountNo]);
+
+                $del = $conn->prepare('DELETE FROM large_transaction_request WHERE account_no = ?');
+                $del->execute([$accountNo]);
             }
 
             $conn->prepare('DELETE FROM account WHERE user_id = ?')->execute([$userId]);
@@ -77,6 +95,7 @@ final class AdminController
             $conn->prepare('DELETE FROM notification WHERE user_id = ?')->execute([$userId]);
             $conn->prepare('DELETE FROM user_log WHERE user_id = ?')->execute([$userId]);
             $conn->prepare('DELETE FROM login_attempt WHERE user_id = ?')->execute([$userId]);
+            $conn->prepare('DELETE FROM officer_alert WHERE user_id = ?')->execute([$userId]);
             $conn->prepare('DELETE FROM user WHERE user_id = ?')->execute([$userId]);
         });
     }

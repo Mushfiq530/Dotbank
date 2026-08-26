@@ -1,5 +1,5 @@
 -- Table: account
--- Depends on: user
+-- Depends on: user, account_type
 CREATE TABLE account (
     account_no VARCHAR(30) PRIMARY KEY,
     user_id VARCHAR(50) NOT NULL,
@@ -7,5 +7,6 @@ CREATE TABLE account (
     account_type VARCHAR(20) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     handled_by VARCHAR(50),
-    FOREIGN KEY (user_id) REFERENCES user(user_id)
+    FOREIGN KEY (user_id) REFERENCES user(user_id),
+    FOREIGN KEY (account_type) REFERENCES account_type(type_name)
 );
