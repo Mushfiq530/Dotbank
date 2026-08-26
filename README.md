@@ -1,17 +1,16 @@
-![DotBank Logo](frontend/public/logo.png)
+<div align="center">
+  <img src="frontend/public/logo.png" alt="DotBank Logo" width="120"/>
+  # 🏦 DotBank
  
-# 🏦 DotBank
+  <p><strong>A full-stack banking system with role-based dashboards for users, officers, and admins</strong></p>
+  <p>React + Vite frontend · PHP 8 REST API · MySQL</p>
+  ![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react&logoColor=black)
+  ![PHP](https://img.shields.io/badge/PHP-8.1%2B-777BB4?logo=php&logoColor=white)
+  ![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
+  ![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?logo=vite&logoColor=white)
+  ![License](https://img.shields.io/badge/License-MIT-green.svg)
  
-**A full-stack banking system with role-based dashboards for users, officers, and admins**
- 
-React + Vite frontend · PHP 8 REST API · MySQL
- 
-![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react&logoColor=black)
-![PHP](https://img.shields.io/badge/PHP-8.1%2B-777BB4?logo=php&logoColor=white)
-![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?logo=vite&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
- 
+</div>
 Everything's wired together for real: React frontend → PHP API → MySQL. No mock data in the frontend — every page calls a real endpoint.
  
 ---
