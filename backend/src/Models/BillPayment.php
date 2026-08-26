@@ -11,21 +11,21 @@ use App\Exceptions\NotFoundException;
 use App\Exceptions\ValidationException;
 use PDO;
 
-final class BankToMobile
+final class BillPayment
 {
     /**
-     * Delegates to sp_mobile_transfer(), same pattern as BankToBank::transfer().
+     * Delegates to sp_pay_bill(), same pattern as BankToBank::transfer()
+     * and BankToMobile::transfer().
      */
-    public static function transfer(
-        string $transferId,
-        string $fromAccount,
-        string $mobileNumber,
-        string $provider,
+    public static function pay(
+        string $paymentId,
+        string $accountNo,
+        string $billType,
         float $amount
     ): void {
-        Database::transaction(function (PDO $conn) use ($transferId, $fromAccount, $mobileNumber, $provider, $amount) {
-            $call = $conn->prepare('CALL sp_mobile_transfer(?, ?, ?, ?, ?, @status, @tx_id)');
-            $call->execute([$transferId, $fromAccount, $mobileNumber, $provider, $amount]);
+        Database::transaction(function (PDO $conn) use ($paymentId, $accountNo, $billType, $amount) {
+            $call = $conn->prepare('CALL sp_pay_bill(?, ?, ?, ?, @status, @tx_id)');
+            $call->execute([$paymentId, $accountNo, $billType, $amount]);
             $call->closeCursor();
 
             $status = (string) $conn->query('SELECT @status AS status')->fetch()['status'];
@@ -42,7 +42,7 @@ final class BankToMobile
                 case 'INSUFFICIENT':
                     throw new InsufficientFundsException('Insufficient balance');
                 default:
-                    throw new \RuntimeException("Unexpected status from sp_mobile_transfer: {$status}");
+                    throw new \RuntimeException("Unexpected status from sp_pay_bill: {$status}");
             }
         });
     }
