@@ -115,6 +115,16 @@ try {
         case $path === '/csrf-token' && $method === 'GET':
             respond(['success' => true, 'csrfToken' => CsrfGuard::token()]);
 
+        // ---------- GUIDE BOT ----------
+        // No login required — the bot should help someone before they've
+        // even registered (e.g. "how do I open an account?").
+        case $path === '/assistant/ask' && $method === 'POST':
+            RateLimiter::check('assistant-ask', session_id(), maxAttempts: 30, windowSeconds: 300);
+            respond(['success' => true] + \App\Services\AssistantService::ask($body['question'] ?? ''));
+
+        case $path === '/assistant/suggestions' && $method === 'GET':
+            respond(['success' => true, 'suggestions' => \App\Services\AssistantService::suggestions()]);
+
         // ---------- AUTH ----------
         case $path === '/register' && $method === 'POST':
             RateLimiter::check('register', $_SERVER['REMOTE_ADDR'] ?? 'unknown', maxAttempts: 5, windowSeconds: 3600);
