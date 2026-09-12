@@ -366,6 +366,53 @@ try {
             $actor = requireRole('user');
             respond(['notifications' => \App\Models\Notification::getUserNotifications($actor['id'])]);
 
+        // ---------- SUPPORT TICKETS ----------
+        case $path === '/support/tickets' && $method === 'POST':
+            $actor = requireRole('user');
+            $ticketId = genId('TCK');
+            \App\Controllers\SupportController::createTicket(
+                $ticketId,
+                $actor['id'],
+                $body['subject'] ?? '',
+                $body['message'] ?? ''
+            );
+            respond(['success' => true, 'ticketId' => $ticketId]);
+
+        case $path === '/support/tickets' && $method === 'GET':
+            $actor = currentRole();
+            if (!$actor) respond(['success' => false], 401);
+            if ($actor['role'] === 'user') {
+                respond(['tickets' => \App\Models\SupportTicket::listForUser($actor['id'])]);
+            }
+            // officer/admin: optional ?status=OPEN|ANSWERED|CLOSED filter, else all
+            respond(['tickets' => \App\Models\SupportTicket::listAll($_GET['status'] ?? null)]);
+
+        case preg_match('#^/support/tickets/([\w-]+)$#', $path, $m) === 1 && $method === 'GET':
+            $actor = currentRole();
+            if (!$actor) respond(['success' => false], 401);
+            $thread = \App\Controllers\SupportController::getThread($m[1]);
+            // A user may only open their own ticket's thread.
+            if ($actor['role'] === 'user' && $thread['ticket']['user_id'] !== $actor['id']) {
+                respond(['success' => false, 'message' => 'Not authorized'], 403);
+            }
+            respond(['success' => true] + $thread);
+
+        case preg_match('#^/support/tickets/([\w-]+)/reply$#', $path, $m) === 1 && $method === 'POST':
+            $actor = currentRole();
+            if (!$actor) respond(['success' => false], 401);
+            if ($actor['role'] === 'user') {
+                $ticket = \App\Models\SupportTicket::requireById($m[1]);
+                if ($ticket['user_id'] !== $actor['id']) respond(['success' => false, 'message' => 'Not authorized'], 403);
+            }
+            \App\Controllers\SupportController::reply($m[1], strtoupper($actor['role']), $actor['id'], $body['message'] ?? '');
+            respond(['success' => true]);
+
+        case preg_match('#^/support/tickets/([\w-]+)/close$#', $path, $m) === 1 && $method === 'POST':
+            $actor = currentRole();
+            if (!$actor || !in_array($actor['role'], ['officer', 'admin'], true)) respond(['success' => false], 401);
+            \App\Controllers\SupportController::close($m[1]);
+            respond(['success' => true]);
+
         // ---------- LOGS ----------
         case $path === '/user-logs' && $method === 'GET':
             $actor = currentRole();

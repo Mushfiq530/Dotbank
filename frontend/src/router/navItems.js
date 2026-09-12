@@ -17,6 +17,7 @@ import {
   BellRing,
   ShieldAlert,
   PiggyBank,
+  LifeBuoy,
 } from "lucide-react";
 
 
@@ -28,6 +29,7 @@ export const userNavItems = [
   { to: "/user/loan", label: "Loan", icon: Landmark },
   { to: "/user/statement", label: "Statement", icon: FileText },
   { to: "/user/notifications", label: "Notifications", icon: Bell, badge: false },
+  { to: "/user/support", label: "Support", icon: LifeBuoy },
   { to: "/user/security", label: "Security", icon: ShieldCheck },
   { to: "/user/profile", label: "Profile", icon: User },
 ];
@@ -39,6 +41,7 @@ export const officerNavItems = [
   { to: "/officer/loan-requests", label: "Loan Requests", icon: Landmark },
   { to: "/officer/deposit-requests", label: "Deposit Requests", icon: PiggyBank },
   { to: "/officer/large-transactions", label: "Large Transactions", icon: ShieldAlert },
+  { to: "/officer/support", label: "Support Tickets", icon: LifeBuoy },
   { to: "/officer/statement-viewer", label: "Statement Viewer", icon: Search },
   { to: "/officer/user-logs", label: "User Logs", icon: ScrollText },
   { to: "/officer/alerts", label: "Account Alerts", icon: BellRing },
@@ -53,6 +56,7 @@ export const adminNavItems = [
   { to: "/admin/manage-accounts", label: "Manage Accounts", icon: Wallet },
   { to: "/admin/deposit-requests", label: "Deposit Requests", icon: PiggyBank },
   { to: "/admin/large-transactions", label: "Large Transactions", icon: ShieldAlert },
+  { to: "/admin/support", label: "Support Tickets", icon: LifeBuoy },
   { to: "/admin/logs", label: "Logs", icon: ScrollText },
   { to: "/admin/alerts", label: "Account Alerts", icon: BellRing },
   { to: "/admin/statement-viewer", label: "Statement Viewer", icon: Search },

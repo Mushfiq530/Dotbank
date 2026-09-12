@@ -29,6 +29,8 @@ import OfficerStatementViewerPage from "../pages/officer/OfficerStatementViewerP
 import OfficerUserLogsPage from "../pages/officer/OfficerUserLogsPage";
 import OfficerProfilePage from "../pages/officer/OfficerProfilePage";
 import OfficerAlertsPage from "../pages/officer/OfficerAlertsPage";
+import OfficerSupportPage from "../pages/officer/OfficerSupportPage";
+import SupportPage from "../pages/user/SupportPage";
 
 // Admin
 import AdminDashboardPage from "../pages/admin/AdminDashboardPage";
@@ -58,6 +60,7 @@ export default function AppRoutes() {
       <Route path="/user/statement" element={<MiniStatementPage />} />
       <Route path="/user/profile" element={<ProfilePage />} />
       <Route path="/user/security" element={<TwoFactorSetupPage />} />
+      <Route path="/user/support" element={<SupportPage />} />
       <Route path="/user/notifications" element={<NotificationsPage />} />
 
       {/* Officer */}
@@ -71,6 +74,7 @@ export default function AppRoutes() {
       <Route path="/officer/user-logs" element={<OfficerUserLogsPage />} />
       <Route path="/officer/profile" element={<OfficerProfilePage />} />
       <Route path="/officer/alerts" element={<OfficerAlertsPage />} />
+      <Route path="/officer/support" element={<OfficerSupportPage />} />
 
       {/* Admin */}
       <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
@@ -82,6 +86,7 @@ export default function AppRoutes() {
       <Route path="/admin/large-transactions" element={<OfficerLargeTransactionsPage />} />
       <Route path="/admin/logs" element={<AdminLogsPage />} />
       <Route path="/admin/alerts" element={<OfficerAlertsPage />} />
+      <Route path="/admin/support" element={<OfficerSupportPage />} />
       <Route path="/admin/statement-viewer" element={<AdminStatementViewerPage />} />
 
       {/* Fallback */}

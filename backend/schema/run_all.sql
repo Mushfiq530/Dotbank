@@ -36,3 +36,5 @@ SOURCE 20_procedures.sql;
 SOURCE 21_triggers.sql;
 SOURCE 22_rate_limit.sql;
 SOURCE 23_two_factor.sql;
+SOURCE 24_support_ticket.sql;
+SOURCE 25_support_message.sql;
