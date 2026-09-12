@@ -13,6 +13,9 @@ use App\Config\Database;
 use App\Exceptions\AppException;
 use App\Support\SessionManager;
 use App\Support\Validator;
+use App\Support\CsrfGuard;
+use App\Support\RateLimiter;
+use App\Exceptions\RateLimitExceededException;
 
 // ---- tiny .env loader (Config\Env just reads getenv(), it doesn't parse the file) ----
 $envPath = __DIR__ . '/../.env';
@@ -29,7 +32,7 @@ if (is_file($envPath)) {
 // ---- CORS for the Vite dev server ----
 header('Access-Control-Allow-Origin: http://localhost:5173');
 header('Access-Control-Allow-Credentials: true');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token');
 header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
 header('Content-Type: application/json');
 
@@ -43,6 +46,18 @@ SessionManager::start();
 $method = $_SERVER['REQUEST_METHOD'];
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $path = preg_replace('#^/api#', '', $path) ?: '/';
+
+// ---- CSRF: every state-changing request must carry a valid token ----
+// (the token endpoint itself and safe GET requests are exempt, since
+// GET must never have side effects)
+$csrfExemptPaths = ['/csrf-token'];
+if (!in_array($method, ['GET', 'HEAD', 'OPTIONS'], true) && !in_array($path, $csrfExemptPaths, true)) {
+    if (!CsrfGuard::verify()) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Invalid or missing CSRF token.']);
+        exit;
+    }
+}
 
 $rawBody = file_get_contents('php://input');
 $body = $rawBody ? (json_decode($rawBody, true) ?? []) : [];
@@ -96,8 +111,13 @@ function requireRole(string $role): array
 try {
     switch (true) {
 
+        // ---------- CSRF ----------
+        case $path === '/csrf-token' && $method === 'GET':
+            respond(['success' => true, 'csrfToken' => CsrfGuard::token()]);
+
         // ---------- AUTH ----------
         case $path === '/register' && $method === 'POST':
+            RateLimiter::check('register', $_SERVER['REMOTE_ADDR'] ?? 'unknown', maxAttempts: 5, windowSeconds: 3600);
             $user = UserController::register(
                 $body['userId'] ?? '',
                 $body['nid'] ?? '',
@@ -109,14 +129,23 @@ try {
             respond(['success' => true, 'userId' => $user->userId]);
 
         case $path === '/login/user' && $method === 'POST':
+            // Two limiter buckets: by IP (stop credential stuffing across many
+            // accounts from one source) and by username (stop targeted brute
+            // force on one account from many sources/proxies).
+            RateLimiter::check('login-ip', $_SERVER['REMOTE_ADDR'] ?? 'unknown', maxAttempts: 20, windowSeconds: 300);
+            RateLimiter::check('login-user', strtolower($body['username'] ?? ''), maxAttempts: 5, windowSeconds: 300);
             $ok = LoginController::userLogin($body['username'] ?? '', $body['password'] ?? '', $body['deviceId'] ?? 'web');
             respond($ok ? ['success' => true] : ['success' => false, 'message' => 'Invalid username or password'], $ok ? 200 : 401);
 
         case $path === '/login/officer' && $method === 'POST':
+            RateLimiter::check('login-ip', $_SERVER['REMOTE_ADDR'] ?? 'unknown', maxAttempts: 20, windowSeconds: 300);
+            RateLimiter::check('login-officer', strtolower($body['username'] ?? ''), maxAttempts: 5, windowSeconds: 300);
             $ok = LoginController::officerLogin($body['username'] ?? '', $body['password'] ?? '', $body['deviceId'] ?? 'web');
             respond($ok ? ['success' => true] : ['success' => false, 'message' => 'Invalid officer ID or password'], $ok ? 200 : 401);
 
         case $path === '/login/admin' && $method === 'POST':
+            RateLimiter::check('login-ip', $_SERVER['REMOTE_ADDR'] ?? 'unknown', maxAttempts: 20, windowSeconds: 300);
+            RateLimiter::check('login-admin', strtolower($body['username'] ?? ''), maxAttempts: 5, windowSeconds: 300);
             $ok = LoginController::adminLogin($body['username'] ?? '', $body['password'] ?? '', $body['deviceId'] ?? 'web');
             respond($ok ? ['success' => true] : ['success' => false, 'message' => 'Invalid admin ID or password'], $ok ? 200 : 401);
 
@@ -389,6 +418,9 @@ try {
         default:
             respond(['success' => false, 'message' => 'Not found'], 404);
     }
+} catch (RateLimitExceededException $e) {
+    header('Retry-After: ' . $e->retryAfterSeconds);
+    respond(['success' => false, 'message' => $e->getMessage()], 429);
 } catch (AppException $e) {
     respond(['success' => false, 'message' => $e->getMessage()], 400);
 } catch (\Throwable $e) {
