@@ -134,20 +134,52 @@ try {
             // force on one account from many sources/proxies).
             RateLimiter::check('login-ip', $_SERVER['REMOTE_ADDR'] ?? 'unknown', maxAttempts: 20, windowSeconds: 300);
             RateLimiter::check('login-user', strtolower($body['username'] ?? ''), maxAttempts: 5, windowSeconds: 300);
-            $ok = LoginController::userLogin($body['username'] ?? '', $body['password'] ?? '', $body['deviceId'] ?? 'web');
-            respond($ok ? ['success' => true] : ['success' => false, 'message' => 'Invalid username or password'], $ok ? 200 : 401);
+            $result = LoginController::userLogin($body['username'] ?? '', $body['password'] ?? '', $body['deviceId'] ?? 'web');
+            if ($result === '2fa_required') respond(['success' => true, 'twoFactorRequired' => true]);
+            respond($result ? ['success' => true] : ['success' => false, 'message' => 'Invalid username or password'], $result ? 200 : 401);
 
         case $path === '/login/officer' && $method === 'POST':
             RateLimiter::check('login-ip', $_SERVER['REMOTE_ADDR'] ?? 'unknown', maxAttempts: 20, windowSeconds: 300);
             RateLimiter::check('login-officer', strtolower($body['username'] ?? ''), maxAttempts: 5, windowSeconds: 300);
-            $ok = LoginController::officerLogin($body['username'] ?? '', $body['password'] ?? '', $body['deviceId'] ?? 'web');
-            respond($ok ? ['success' => true] : ['success' => false, 'message' => 'Invalid officer ID or password'], $ok ? 200 : 401);
+            $result = LoginController::officerLogin($body['username'] ?? '', $body['password'] ?? '', $body['deviceId'] ?? 'web');
+            if ($result === '2fa_required') respond(['success' => true, 'twoFactorRequired' => true]);
+            respond($result ? ['success' => true] : ['success' => false, 'message' => 'Invalid officer ID or password'], $result ? 200 : 401);
 
         case $path === '/login/admin' && $method === 'POST':
             RateLimiter::check('login-ip', $_SERVER['REMOTE_ADDR'] ?? 'unknown', maxAttempts: 20, windowSeconds: 300);
             RateLimiter::check('login-admin', strtolower($body['username'] ?? ''), maxAttempts: 5, windowSeconds: 300);
-            $ok = LoginController::adminLogin($body['username'] ?? '', $body['password'] ?? '', $body['deviceId'] ?? 'web');
-            respond($ok ? ['success' => true] : ['success' => false, 'message' => 'Invalid admin ID or password'], $ok ? 200 : 401);
+            $result = LoginController::adminLogin($body['username'] ?? '', $body['password'] ?? '', $body['deviceId'] ?? 'web');
+            if ($result === '2fa_required') respond(['success' => true, 'twoFactorRequired' => true]);
+            respond($result ? ['success' => true] : ['success' => false, 'message' => 'Invalid admin ID or password'], $result ? 200 : 401);
+
+        case $path === '/login/verify-2fa' && $method === 'POST':
+            RateLimiter::check('2fa-verify', session_id(), maxAttempts: 8, windowSeconds: 300);
+            $ok = LoginController::verifyTwoFactor($body['code'] ?? '');
+            respond($ok ? ['success' => true] : ['success' => false, 'message' => 'Incorrect code.'], $ok ? 200 : 401);
+
+        // ---------- 2FA setup/management (for an already-logged-in actor) ----------
+        case $path === '/2fa/status' && $method === 'GET':
+            $actor = currentRole();
+            if (!$actor) respond(['success' => false], 401);
+            respond(['success' => true] + \App\Controllers\TwoFactorController::status(strtoupper($actor['role']), $actor['id']));
+
+        case $path === '/2fa/setup' && $method === 'POST':
+            $actor = currentRole();
+            if (!$actor) respond(['success' => false], 401);
+            $label = $body['label'] ?? $actor['id'];
+            respond(['success' => true] + \App\Controllers\TwoFactorController::setup(strtoupper($actor['role']), $actor['id'], $label));
+
+        case $path === '/2fa/confirm' && $method === 'POST':
+            $actor = currentRole();
+            if (!$actor) respond(['success' => false], 401);
+            \App\Controllers\TwoFactorController::confirm(strtoupper($actor['role']), $actor['id'], $body['code'] ?? '');
+            respond(['success' => true]);
+
+        case $path === '/2fa/disable' && $method === 'POST':
+            $actor = currentRole();
+            if (!$actor) respond(['success' => false], 401);
+            \App\Controllers\TwoFactorController::disable(strtoupper($actor['role']), $actor['id'], $body['password'] ?? '');
+            respond(['success' => true]);
 
         case $path === '/logout' && $method === 'POST':
             SessionManager::logout();

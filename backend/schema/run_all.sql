@@ -35,3 +35,4 @@ SOURCE 19_views.sql;
 SOURCE 20_procedures.sql;
 SOURCE 21_triggers.sql;
 SOURCE 22_rate_limit.sql;
+SOURCE 23_two_factor.sql;

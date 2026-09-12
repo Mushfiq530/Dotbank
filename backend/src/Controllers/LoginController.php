@@ -8,6 +8,7 @@ use App\Exceptions\AuthenticationException;
 use App\Models\Admin;
 use App\Models\LoginAttempt;
 use App\Models\Officer;
+use App\Models\TwoFactorAuth;
 use App\Models\User;
 use App\Support\SessionManager;
 
@@ -15,7 +16,7 @@ final class LoginController
 {
     private const MAX_FAILED_ATTEMPTS = 5;
 
-    public static function userLogin(string $userId, string $password, string $deviceId): bool
+    public static function userLogin(string $userId, string $password, string $deviceId): bool|string
     {
         return self::attemptLogin(
             'USER',
@@ -30,7 +31,7 @@ final class LoginController
         );
     }
 
-    public static function officerLogin(string $officerId, string $password, string $deviceId = 'web'): bool
+    public static function officerLogin(string $officerId, string $password, string $deviceId = 'web'): bool|string
     {
         return self::attemptLogin(
             'OFFICER',
@@ -45,7 +46,7 @@ final class LoginController
         );
     }
 
-    public static function adminLogin(string $adminId, string $password, string $deviceId = 'web'): bool
+    public static function adminLogin(string $adminId, string $password, string $deviceId = 'web'): bool|string
     {
         return self::attemptLogin(
             'ADMIN',
@@ -76,6 +77,8 @@ final class LoginController
      * @template T
      * @param callable(): ?T $find
      * @param callable(T): bool $verify
+     * @return bool|string true = fully logged in, false = wrong credentials,
+     *                      '2fa_required' = password correct, waiting on a TOTP code
      */
     private static function attemptLogin(
         string $accountType,
@@ -85,7 +88,7 @@ final class LoginController
         callable $verify,
         string $sessionKey,
         string $sessionValue
-    ): bool {
+    ): bool|string {
         SessionManager::start();
 
         if (LoginAttempt::failedAttempts($accountType, $accountId, $deviceId) >= self::MAX_FAILED_ATTEMPTS) {
@@ -101,6 +104,22 @@ final class LoginController
         }
 
         LoginAttempt::clearAttempts($accountType, $accountId, $deviceId);
+
+        if (TwoFactorAuth::isEnabled($accountType, $accountId)) {
+            // Password is correct, but don't grant a real session yet —
+            // stash a pending marker and make the frontend collect a TOTP
+            // code before we call regenerate()/set the session key below.
+            SessionManager::regenerate();
+            unset($_SESSION['user_id'], $_SESSION['officer_id'], $_SESSION['admin_id']);
+            $_SESSION['pending_2fa'] = [
+                'type' => $accountType,
+                'sessionKey' => $sessionKey,
+                'sessionValue' => $sessionValue,
+            ];
+
+            return '2fa_required';
+        }
+
         SessionManager::regenerate();
 
         // Clear any leftover role from a previous login in this browser
@@ -108,6 +127,30 @@ final class LoginController
         // in index.php picks whichever role key it checks first.
         unset($_SESSION['user_id'], $_SESSION['officer_id'], $_SESSION['admin_id']);
         $_SESSION[$sessionKey] = $sessionValue;
+
+        return true;
+    }
+
+    /**
+     * Completes a login that was paused for 2FA. Called from
+     * POST /login/verify-2fa once the actor submits their code.
+     */
+    public static function verifyTwoFactor(string $code): bool
+    {
+        SessionManager::start();
+
+        $pending = $_SESSION['pending_2fa'] ?? null;
+        if (!$pending) {
+            throw new AuthenticationException('No login is waiting for a 2FA code.');
+        }
+
+        $record = \App\Models\TwoFactorAuth::find($pending['type'], $pending['sessionValue']);
+        if (!$record || !\App\Services\TotpService::verify($record->secret, $code)) {
+            return false;
+        }
+
+        unset($_SESSION['pending_2fa']);
+        $_SESSION[$pending['sessionKey']] = $pending['sessionValue'];
 
         return true;
     }

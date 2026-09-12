@@ -28,6 +28,7 @@ export const userNavItems = [
   { to: "/user/loan", label: "Loan", icon: Landmark },
   { to: "/user/statement", label: "Statement", icon: FileText },
   { to: "/user/notifications", label: "Notifications", icon: Bell, badge: false },
+  { to: "/user/security", label: "Security", icon: ShieldCheck },
   { to: "/user/profile", label: "Profile", icon: User },
 ];
 

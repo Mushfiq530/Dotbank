@@ -23,6 +23,8 @@ export default function LoginFormPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [awaiting2fa, setAwaiting2fa] = useState(false);
+  const [code, setCode] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,8 +32,31 @@ export default function LoginFormPage() {
     setLoading(true);
     try {
       const data = await api.post(endpoint, { username, password });
-      if (data.success) { window.location.href = dest; }
-      else { setError(data.message || "Login failed"); }
+      if (data.twoFactorRequired) {
+        setAwaiting2fa(true);
+      } else if (data.success) {
+        window.location.href = dest;
+      } else {
+        setError(data.message || "Login failed");
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const data = await api.post("/login/verify-2fa", { code });
+      if (data.success) {
+        window.location.href = dest;
+      } else {
+        setError(data.message || "Incorrect code");
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -102,8 +127,14 @@ export default function LoginFormPage() {
             className="w-full max-w-md"
           >
             <div className="mb-8">
-              <h1 className={`font-display text-3xl font-bold ${isDark ? "text-white" : "text-ink"}`}>{title}</h1>
-              <p className={`mt-2 ${isDark ? "text-inkDark-muted" : "text-ink-muted"}`}>Sign in to continue to your dashboard</p>
+              <h1 className={`font-display text-3xl font-bold ${isDark ? "text-white" : "text-ink"}`}>
+                {awaiting2fa ? "Enter your code" : title}
+              </h1>
+              <p className={`mt-2 ${isDark ? "text-inkDark-muted" : "text-ink-muted"}`}>
+                {awaiting2fa
+                  ? "Open your authenticator app and enter the 6-digit code"
+                  : "Sign in to continue to your dashboard"}
+              </p>
             </div>
 
             {error && (
@@ -117,6 +148,39 @@ export default function LoginFormPage() {
               </motion.div>
             )}
 
+            {awaiting2fa ? (
+              <form onSubmit={handleVerifyCode} className="space-y-5">
+                <FormInput
+                  label="6-digit code"
+                  placeholder="123456"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  inputMode="numeric"
+                  maxLength={6}
+                />
+                <motion.button
+                  type="submit"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  disabled={loading}
+                  className="mt-2 w-full rounded-xl bg-gradient-brand py-3.5 text-base font-bold text-white btn-glow transition-opacity disabled:opacity-60"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                      Verifying…
+                    </span>
+                  ) : "Verify"}
+                </motion.button>
+                <button
+                  type="button"
+                  onClick={() => { setAwaiting2fa(false); setCode(""); setError(""); }}
+                  className={`w-full text-center text-sm ${isDark ? "text-inkDark-muted hover:text-inkDark" : "text-ink-muted hover:text-ink"} transition-colors`}
+                >
+                  Back to login
+                </button>
+              </form>
+            ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-4">
                 <FormInput
@@ -149,7 +213,9 @@ export default function LoginFormPage() {
                 ) : "Sign in"}
               </motion.button>
             </form>
+            )}
 
+            {!awaiting2fa && (
             <p className={`mt-6 text-center text-sm ${isDark ? "text-inkDark-muted" : "text-ink-muted"}`}>
               Need an account?{" "}
               <button
@@ -159,6 +225,7 @@ export default function LoginFormPage() {
                 Register here
               </button>
             </p>
+            )}
           </motion.div>
         </div>
       </div>
