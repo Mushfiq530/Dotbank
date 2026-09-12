@@ -16,6 +16,7 @@ import LoanRequestPage from "../pages/user/LoanRequestPage";
 import MiniStatementPage from "../pages/user/MiniStatementPage";
 import ProfilePage from "../pages/user/ProfilePage";
 import TwoFactorSetupPage from "../pages/user/TwoFactorSetupPage";
+import WalletPage from "../pages/user/WalletPage";
 import NotificationsPage from "../pages/user/NotificationsPage";
 
 // Officer
@@ -61,6 +62,7 @@ export default function AppRoutes() {
       <Route path="/user/profile" element={<ProfilePage />} />
       <Route path="/user/security" element={<TwoFactorSetupPage />} />
       <Route path="/user/support" element={<SupportPage />} />
+      <Route path="/user/wallet" element={<WalletPage />} />
       <Route path="/user/notifications" element={<NotificationsPage />} />
 
       {/* Officer */}

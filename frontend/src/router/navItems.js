@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   PiggyBank,
   LifeBuoy,
+  Wallet2,
 } from "lucide-react";
 
 
@@ -30,6 +31,7 @@ export const userNavItems = [
   { to: "/user/statement", label: "Statement", icon: FileText },
   { to: "/user/notifications", label: "Notifications", icon: Bell, badge: false },
   { to: "/user/support", label: "Support", icon: LifeBuoy },
+  { to: "/user/wallet", label: "Wallet", icon: Wallet2 },
   { to: "/user/security", label: "Security", icon: ShieldCheck },
   { to: "/user/profile", label: "Profile", icon: User },
 ];

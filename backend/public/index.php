@@ -423,6 +423,43 @@ try {
             \App\Controllers\SupportController::close($m[1]);
             respond(['success' => true]);
 
+        // ---------- WALLET ----------
+        case $path === '/wallet' && $method === 'GET':
+            $actor = requireRole('user');
+            $wallet = \App\Controllers\WalletController::open($actor['id']);
+            respond([
+                'success' => true,
+                'walletId' => $wallet->walletId,
+                'balance' => $wallet->balance,
+                'status' => $wallet->status,
+            ]);
+
+        case $path === '/wallet/transactions' && $method === 'GET':
+            $actor = requireRole('user');
+            $wallet = \App\Models\Wallet::findByUserId($actor['id']);
+            if (!$wallet) respond(['success' => false, 'message' => 'No wallet yet'], 404);
+            respond(['success' => true, 'transactions' => \App\Models\Wallet::transactionsFor($wallet->walletId)]);
+
+        case $path === '/wallet/topup' && $method === 'POST':
+            $actor = requireRole('user');
+            $wallet = \App\Models\Wallet::findByUserId($actor['id']);
+            if (!$wallet) respond(['success' => false, 'message' => 'No wallet yet'], 404);
+            \App\Controllers\WalletController::topUp($actor['id'], $wallet->walletId, $body['accountNo'] ?? '', (float) ($body['amount'] ?? 0));
+            respond(['success' => true]);
+
+        case $path === '/wallet/withdraw' && $method === 'POST':
+            $actor = requireRole('user');
+            $wallet = \App\Models\Wallet::findByUserId($actor['id']);
+            if (!$wallet) respond(['success' => false, 'message' => 'No wallet yet'], 404);
+            \App\Controllers\WalletController::withdraw($actor['id'], $wallet->walletId, $body['accountNo'] ?? '', (float) ($body['amount'] ?? 0));
+            respond(['success' => true]);
+
+        case $path === '/wallet/transfer' && $method === 'POST':
+            $actor = requireRole('user');
+            RateLimiter::check('wallet-transfer', $actor['id'], maxAttempts: 20, windowSeconds: 300);
+            \App\Controllers\WalletController::transferToUser($actor['id'], $body['toUserId'] ?? '', (float) ($body['amount'] ?? 0));
+            respond(['success' => true]);
+
         // ---------- LOGS ----------
         case $path === '/user-logs' && $method === 'GET':
             $actor = currentRole();

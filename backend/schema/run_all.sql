@@ -38,3 +38,6 @@ SOURCE 22_rate_limit.sql;
 SOURCE 23_two_factor.sql;
 SOURCE 24_support_ticket.sql;
 SOURCE 25_support_message.sql;
+SOURCE 26_wallet.sql;
+SOURCE 27_wallet_transaction.sql;
+SOURCE 28_wallet_procedures.sql;
