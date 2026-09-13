@@ -86,6 +86,20 @@ final class User
         $stmt->execute([$relativePath, $this->userId]);
     }
 
+    /**
+     * Overwrites the stored email. Callers (SecurityController) are
+     * responsible for having already verified: (1) the actor's existing
+     * 2FA code, and (2) a fresh OTP sent to the new address — this method
+     * just performs the write once both checks have passed.
+     */
+    public function updateEmail(string $newEmail): void
+    {
+        $stmt = Database::getConnection()->prepare(
+            'UPDATE user SET email = ? WHERE user_id = ?'
+        );
+        $stmt->execute([$newEmail, $this->userId]);
+    }
+
     public function verifyPassword(string $password): bool
     {
         return password_verify($password, $this->password);

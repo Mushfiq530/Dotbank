@@ -191,6 +191,56 @@ try {
             \App\Controllers\TwoFactorController::disable(strtoupper($actor['role']), $actor['id'], $body['password'] ?? '');
             respond(['success' => true]);
 
+        // ---------- SECURITY: email-OTP-gated sensitive actions (user only) ----------
+        case $path === '/security/password-change/request-otp' && $method === 'POST':
+            $actor = requireRole('user');
+            RateLimiter::check('otp-request', $actor['id'], maxAttempts: 5, windowSeconds: 900);
+            \App\Controllers\SecurityController::requestPasswordChangeOtp($actor['id']);
+            respond(['success' => true, 'message' => 'A verification code has been emailed to you.']);
+
+        case $path === '/security/password-change/confirm' && $method === 'POST':
+            $actor = requireRole('user');
+            RateLimiter::check('otp-verify', $actor['id'], maxAttempts: 8, windowSeconds: 900);
+            \App\Controllers\SecurityController::confirmPasswordChange(
+                $actor['id'],
+                $body['otp'] ?? '',
+                $body['newPassword'] ?? '',
+                $body['confirmPassword'] ?? ''
+            );
+            respond(['success' => true, 'message' => 'Password changed successfully.']);
+
+        case $path === '/security/2fa-disable/request-otp' && $method === 'POST':
+            $actor = requireRole('user');
+            RateLimiter::check('otp-request', $actor['id'], maxAttempts: 5, windowSeconds: 900);
+            \App\Controllers\SecurityController::requestTwoFactorDisableOtp($actor['id']);
+            respond(['success' => true, 'message' => 'A verification code has been emailed to you.']);
+
+        case $path === '/security/2fa-disable/confirm' && $method === 'POST':
+            $actor = requireRole('user');
+            RateLimiter::check('otp-verify', $actor['id'], maxAttempts: 8, windowSeconds: 900);
+            \App\Controllers\SecurityController::confirmTwoFactorDisable(
+                $actor['id'],
+                $body['password'] ?? '',
+                $body['otp'] ?? ''
+            );
+            respond(['success' => true, 'message' => 'Two-factor authentication disabled.']);
+
+        case $path === '/security/email-change/request' && $method === 'POST':
+            $actor = requireRole('user');
+            RateLimiter::check('otp-request', $actor['id'], maxAttempts: 5, windowSeconds: 900);
+            \App\Controllers\SecurityController::requestEmailChange(
+                $actor['id'],
+                $body['totpCode'] ?? '',
+                $body['newEmail'] ?? ''
+            );
+            respond(['success' => true, 'message' => 'A verification code has been sent to the new email address.']);
+
+        case $path === '/security/email-change/confirm' && $method === 'POST':
+            $actor = requireRole('user');
+            RateLimiter::check('otp-verify', $actor['id'], maxAttempts: 8, windowSeconds: 900);
+            \App\Controllers\SecurityController::confirmEmailChange($actor['id'], $body['otp'] ?? '');
+            respond(['success' => true, 'message' => 'Email address updated.']);
+
         case $path === '/logout' && $method === 'POST':
             SessionManager::logout();
             respond(['success' => true]);
@@ -202,6 +252,9 @@ try {
             if ($actor['role'] === 'user') {
                 $user = \App\Models\User::findById($actor['id']);
                 $extra['profilePictureUrl'] = profilePictureUrl($user?->profilePicture);
+                // Exposed so the Security page can show/confirm which
+                // address a change-email or OTP request is going to.
+                $extra['email'] = $user?->email;
             }
             respond(['success' => true] + $actor + $extra);
 

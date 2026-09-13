@@ -41,3 +41,4 @@ SOURCE 25_support_message.sql;
 SOURCE 26_wallet.sql;
 SOURCE 27_wallet_transaction.sql;
 SOURCE 28_wallet_procedures.sql;
+SOURCE 29_otp.sql;
