@@ -137,10 +137,16 @@ export default function WalletPage() {
                 <select
                   value={accountNo}
                   onChange={(e) => setAccountNo(e.target.value)}
-                  className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-transparent px-4 py-3 text-ink dark:text-white outline-none focus:border-brand-blue"
+                  className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-surfaceDark px-4 py-3 text-ink dark:text-white outline-none focus:border-brand-blue"
                 >
                   {(accounts || []).map((a) => (
-                    <option key={a.account_no} value={a.account_no}>{a.account_no}</option>
+                    <option
+                      key={a.account_no}
+                      value={a.account_no}
+                      className="bg-white dark:bg-surfaceDark text-ink dark:text-white"
+                    >
+                      {a.account_no}
+                    </option>
                   ))}
                 </select>
               </div>
