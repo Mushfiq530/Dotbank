@@ -55,13 +55,13 @@ export default function WalletPage() {
       const amt = parseFloat(amount);
       if (tab === "topup") {
         await api.post("/wallet/topup", { accountNo, amount: amt });
-        setSuccess(`Topped up ৳${amt.toFixed(2)} to your wallet.`);
+        setSuccess(`Topped up $${amt.toFixed(2)} to your wallet.`);
       } else if (tab === "withdraw") {
         await api.post("/wallet/withdraw", { accountNo, amount: amt });
-        setSuccess(`Withdrew ৳${amt.toFixed(2)} back to your account.`);
+        setSuccess(`Withdrew $${amt.toFixed(2)} back to your account.`);
       } else {
         await api.post("/wallet/transfer", { toUserId, amount: amt });
-        setSuccess(`Sent ৳${amt.toFixed(2)} to ${toUserId}.`);
+        setSuccess(`Sent $${amt.toFixed(2)} to ${toUserId}.`);
         setToUserId("");
       }
       setAmount("");
@@ -91,7 +91,7 @@ export default function WalletPage() {
           <div className="rounded-card bg-gradient-brand p-6 text-white shadow-card mb-6">
             <p className="text-sm text-white/75">Wallet Balance</p>
             <p className="mt-1 font-display text-3xl font-bold">
-              {loading ? "…" : `৳${Number(wallet?.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+              {loading ? "…" : `$${Number(wallet?.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
             </p>
           </div>
 
@@ -202,7 +202,7 @@ export default function WalletPage() {
                     </p>
                   </div>
                   <p className={`text-sm font-bold ${typeStyles[t.type]}`}>
-                    {typeSign[t.type]}৳{Number(t.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {typeSign[t.type]}${Number(t.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               ))}
