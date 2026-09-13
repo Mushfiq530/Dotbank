@@ -15,7 +15,7 @@ import PayBillPage from "../pages/user/PayBillPage";
 import LoanRequestPage from "../pages/user/LoanRequestPage";
 import MiniStatementPage from "../pages/user/MiniStatementPage";
 import ProfilePage from "../pages/user/ProfilePage";
-import TwoFactorSetupPage from "../pages/user/TwoFactorSetupPage";
+import SecurityPage from "../pages/user/SecurityPage";
 import WalletPage from "../pages/user/WalletPage";
 import NotificationsPage from "../pages/user/NotificationsPage";
 
@@ -60,7 +60,7 @@ export default function AppRoutes() {
       <Route path="/user/loan" element={<LoanRequestPage />} />
       <Route path="/user/statement" element={<MiniStatementPage />} />
       <Route path="/user/profile" element={<ProfilePage />} />
-      <Route path="/user/security" element={<TwoFactorSetupPage />} />
+      <Route path="/user/security" element={<SecurityPage />} />
       <Route path="/user/support" element={<SupportPage />} />
       <Route path="/user/wallet" element={<WalletPage />} />
       <Route path="/user/notifications" element={<NotificationsPage />} />
