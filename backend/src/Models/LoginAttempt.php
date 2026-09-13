@@ -31,16 +31,26 @@ final class LoginAttempt
         $stmt->execute([$accountType, $accountId, $deviceId, $success]);
     }
 
+    /**
+     * Failed attempts for this (account, device) within a recent window.
+     * Time-boxed on purpose — this backs the "too many attempts, try again
+     * later" throttle in LoginController, so it needs to actually expire.
+     * (Contrast with totalFailedAttempts() below, used by the database
+     * trigger's permanent freeze-after-3 rule, which is intentionally NOT
+     * time-boxed — that one is meant to require an officer to clear it.)
+     */
     public static function failedAttempts(
         string $accountType,
         string $accountId,
-        string $deviceId
+        string $deviceId,
+        int $windowMinutes = 15
     ): int {
         $stmt = Database::getConnection()->prepare(
             'SELECT COUNT(*) total FROM login_attempt
-             WHERE account_type = ? AND user_id = ? AND device_id = ? AND success = FALSE'
+             WHERE account_type = ? AND user_id = ? AND device_id = ? AND success = FALSE
+             AND attempt_time > (NOW() - INTERVAL ? MINUTE)'
         );
-        $stmt->execute([$accountType, $accountId, $deviceId]);
+        $stmt->execute([$accountType, $accountId, $deviceId, $windowMinutes]);
 
         return (int) $stmt->fetch()['total'];
     }
