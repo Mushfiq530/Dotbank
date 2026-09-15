@@ -10,7 +10,6 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
-  KeyRound,
   Mail,
 } from "lucide-react";
 
@@ -58,12 +57,11 @@ export default function SecurityPage() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
           <h1 className="font-display text-2xl font-bold text-ink dark:text-inkDark">Security</h1>
           <p className="text-sm text-ink-muted dark:text-inkDark-muted mt-1">
-            Manage two-factor authentication, your password, and your email address.
+            Manage two-factor authentication and your email address.
           </p>
         </motion.div>
 
         <TwoFactorSection />
-        <ChangePasswordSection />
         <ChangeEmailSection />
       </div>
     </AppLayout>
@@ -71,8 +69,8 @@ export default function SecurityPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Two-factor authentication: existing setup/enable flow, plus a disable flow
-// that now requires the emailed OTP on top of the current password.
+// Two-factor authentication: setup/enable, and disable with just your
+// current password (the original, simple flow — no emailed code).
 // ---------------------------------------------------------------------------
 function TwoFactorSection() {
   const [enabled, setEnabled] = useState(null); // null = loading
@@ -81,7 +79,6 @@ function TwoFactorSection() {
   const [manualSecret, setManualSecret] = useState("");
   const [setupCode, setSetupCode] = useState("");
   const [password, setPassword] = useState("");
-  const [disableOtp, setDisableOtp] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
@@ -131,43 +128,15 @@ function TwoFactorSection() {
     }
   }
 
-  async function beginDisable() {
-    resetMessages();
-    setBusy(true);
-    try {
-      await api.post("/security/2fa-disable/request-otp", {});
-      setMode("disable");
-      setSuccess("A verification code has been emailed to you.");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function resendDisableOtp() {
-    resetMessages();
-    setBusy(true);
-    try {
-      await api.post("/security/2fa-disable/request-otp", {});
-      setSuccess("A new code has been emailed to you.");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function confirmDisable(e) {
     e.preventDefault();
     resetMessages();
     setBusy(true);
     try {
-      await api.post("/security/2fa-disable/confirm", { password, otp: disableOtp });
+      await api.post("/2fa/disable", { password });
       setEnabled(false);
       setMode("idle");
       setPassword("");
-      setDisableOtp("");
       setSuccess("Two-factor authentication has been disabled.");
     } catch (err) {
       setError(err.message);
@@ -220,7 +189,7 @@ function TwoFactorSection() {
         ) : mode === "disable" ? (
           <form onSubmit={confirmDisable} className="space-y-4">
             <p className="text-sm text-ink dark:text-inkDark">
-              Enter your password and the code emailed to you to turn off two-factor authentication.
+              Enter your password to turn off two-factor authentication.
             </p>
             <input
               type="password"
@@ -230,24 +199,12 @@ function TwoFactorSection() {
               className={inputClass}
               autoComplete="current-password"
             />
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="Emailed code"
-              value={disableOtp}
-              onChange={(e) => setDisableOtp(e.target.value)}
-              className={otpInputClass}
-            />
             <button type="submit" disabled={busy} className={dangerBtn}>
               {busy ? "Disabling…" : "Disable 2FA"}
             </button>
-            <button type="button" onClick={resendDisableOtp} disabled={busy} className={ghostBtn}>
-              Resend code
-            </button>
             <button
               type="button"
-              onClick={() => { setMode("idle"); setPassword(""); setDisableOtp(""); resetMessages(); }}
+              onClick={() => { setMode("idle"); setPassword(""); resetMessages(); }}
               className={ghostBtn}
             >
               Cancel
@@ -264,7 +221,7 @@ function TwoFactorSection() {
                 <p className="text-xs text-ink-muted dark:text-inkDark-muted">A code is required at login</p>
               </div>
             </div>
-            <button onClick={beginDisable} disabled={busy} className="shrink-0 text-sm font-semibold text-dangerDark disabled:opacity-50">
+            <button onClick={() => setMode("disable")} disabled={busy} className="shrink-0 text-sm font-semibold text-dangerDark disabled:opacity-50">
               Disable
             </button>
           </div>
@@ -294,148 +251,14 @@ function TwoFactorSection() {
 }
 
 // ---------------------------------------------------------------------------
-// Change password: request an emailed OTP, then submit it together with the
-// new password. Separate from the existing SMS-based forgot-password flow.
-// ---------------------------------------------------------------------------
-function ChangePasswordSection() {
-  const [mode, setMode] = useState("idle"); // idle | verify
-  const [otp, setOtp] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  function resetMessages() {
-    setError("");
-    setSuccess("");
-  }
-
-  async function requestOtp() {
-    resetMessages();
-    setBusy(true);
-    try {
-      await api.post("/security/password-change/request-otp", {});
-      setMode("verify");
-      setSuccess("A verification code has been emailed to you.");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function resendOtp() {
-    resetMessages();
-    setBusy(true);
-    try {
-      await api.post("/security/password-change/request-otp", {});
-      setSuccess("A new code has been emailed to you.");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function confirm(e) {
-    e.preventDefault();
-    resetMessages();
-    setBusy(true);
-    try {
-      await api.post("/security/password-change/confirm", { otp, newPassword, confirmPassword });
-      setMode("idle");
-      setOtp("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setSuccess("Password changed successfully.");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <section>
-      <SectionHeader title="Change password" subtitle="Requires a code emailed to your registered address." />
-      <Banner error={error} success={success} />
-      <div className={cardClass}>
-        {mode === "idle" ? (
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black/5 dark:bg-white/8 text-ink-muted dark:text-inkDark-muted">
-                <KeyRound size={18} />
-              </div>
-              <p className="text-sm font-semibold text-ink dark:text-inkDark">Update your password</p>
-            </div>
-            <button
-              onClick={requestOtp}
-              disabled={busy}
-              className="shrink-0 rounded-xl bg-gradient-brand px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
-            >
-              {busy ? "…" : "Change"}
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={confirm} className="space-y-4">
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="Emailed code"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              className={otpInputClass}
-            />
-            <input
-              type="password"
-              placeholder="New password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className={inputClass}
-              autoComplete="new-password"
-            />
-            <input
-              type="password"
-              placeholder="Confirm new password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className={inputClass}
-              autoComplete="new-password"
-            />
-            <button type="submit" disabled={busy} className={primaryBtn}>
-              {busy ? "Saving…" : "Confirm new password"}
-            </button>
-            <button type="button" onClick={resendOtp} disabled={busy} className={ghostBtn}>
-              Resend code
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode("idle"); setOtp(""); setNewPassword(""); setConfirmPassword(""); resetMessages(); }}
-              className={ghostBtn}
-            >
-              Cancel
-            </button>
-          </form>
-        )}
-      </div>
-    </section>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Change email: blocked entirely unless 2FA is already enabled. Step 1
-// verifies a TOTP code and sends an OTP to the NEW address; step 2 confirms
-// that OTP, which is the point the email actually changes.
+// Change email: blocked entirely unless 2FA is already enabled. A valid
+// authenticator code is enough to change it immediately — no emailed code.
 // ---------------------------------------------------------------------------
 function ChangeEmailSection() {
   const [twoFaEnabled, setTwoFaEnabled] = useState(null);
   const [currentEmail, setCurrentEmail] = useState("");
-  const [mode, setMode] = useState("idle"); // idle | verify
   const [newEmail, setNewEmail] = useState("");
   const [totpCode, setTotpCode] = useState("");
-  const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
@@ -450,32 +273,15 @@ function ChangeEmailSection() {
     setSuccess("");
   }
 
-  async function requestChange(e) {
+  async function submit(e) {
     e.preventDefault();
     resetMessages();
     setBusy(true);
     try {
-      await api.post("/security/email-change/request", { totpCode, newEmail });
-      setMode("verify");
-      setSuccess(`A verification code has been sent to ${newEmail}.`);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function confirmChange(e) {
-    e.preventDefault();
-    resetMessages();
-    setBusy(true);
-    try {
-      await api.post("/security/email-change/confirm", { otp });
+      await api.post("/security/email-change", { totpCode, newEmail });
       setCurrentEmail(newEmail);
-      setMode("idle");
       setNewEmail("");
       setTotpCode("");
-      setOtp("");
       setSuccess("Email address updated.");
     } catch (err) {
       setError(err.message);
@@ -491,7 +297,7 @@ function ChangeEmailSection() {
         subtitle={
           twoFaEnabled === false
             ? "Enable two-factor authentication above before changing your email."
-            : "Requires your authenticator code, then a code sent to the new address."
+            : "Requires your authenticator code."
         }
       />
       <Banner error={error} success={success} />
@@ -510,8 +316,8 @@ function ChangeEmailSection() {
               <p className="text-xs text-ink-muted dark:text-inkDark-muted">2FA required to change this</p>
             </div>
           </div>
-        ) : mode === "idle" ? (
-          <form onSubmit={requestChange} className="space-y-4">
+        ) : (
+          <form onSubmit={submit} className="space-y-4">
             <p className="text-xs text-ink-muted dark:text-inkDark-muted">Current: {currentEmail}</p>
             <input
               type="email"
@@ -531,32 +337,7 @@ function ChangeEmailSection() {
               className={otpInputClass}
             />
             <button type="submit" disabled={busy} className={primaryBtn}>
-              {busy ? "Sending…" : "Send code to new email"}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={confirmChange} className="space-y-4">
-            <p className="text-sm text-ink dark:text-inkDark">
-              Enter the code sent to <span className="font-semibold">{newEmail}</span>.
-            </p>
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="Verification code"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              className={otpInputClass}
-            />
-            <button type="submit" disabled={busy} className={primaryBtn}>
-              {busy ? "Confirming…" : "Confirm new email"}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode("idle"); setOtp(""); resetMessages(); }}
-              className={ghostBtn}
-            >
-              Cancel
+              {busy ? "Updating…" : "Update email"}
             </button>
           </form>
         )}
